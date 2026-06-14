@@ -56,9 +56,12 @@ def train_phase1(data_dir, labels_file, epochs=5, batch_size=32, lr=1e-4):
         os.makedirs("checkpoints", exist_ok=True)
         torch.save(model.state_dict(), f"checkpoints/geonorm_phase1_epoch{epoch+1}.pth")
 
+# Sửa lại phần cuối file train_phase1.py của bạn thành thế này:
 if __name__ == "__main__":
-    # Cấu hình đường dẫn. Khi lên Kaggle, bạn sẽ đổi hai đường dẫn này.
-    DATA_DIR = "data/mvtec_geo"
-    LABELS_FILE = "data/mvtec_geo/geo_labels.pt"
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_dir", type=str, default="data/mvtec_geo")
+    parser.add_argument("--labels_file", type=str, default="data/mvtec_geo/geo_labels.pt")
+    args = parser.parse_args()
     
-    train_phase1(DATA_DIR, LABELS_FILE)
+    train_phase1(args.data_dir, args.labels_file)
