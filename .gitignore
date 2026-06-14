@@ -1,0 +1,10 @@
+# Bỏ qua dữ liệu
+data/
+
+# Bỏ qua model weights
+checkpoints/
+
+# Bỏ qua hệ thống
+__pycache__/
+*.pyc
+.env
