@@ -1,50 +1,84 @@
 import torch
-import torchvision.models as models
 import torch.nn as nn
 import torch.nn.functional as F
-class PatchCoreBaseline:
-    """ Khung xử lý trích xuất đặc trưng vùng lân cận (Local patch embedding) """
-    def __init__(self):
-        # Sử dụng backbone chuẩn theo paper gốc
-        resnet = models.wide_resnet50_2(weights='DEFAULT')
-        self.feature_extractor = nn.Sequential(*list(resnet.children())[:7]) # Lấy đến layer3
-        self.feature_extractor.eval()
-        for param in self.feature_extractor.parameters():
+import torchvision.models as models
+from sklearn.neighbors import NearestNeighbors
+import numpy as np
+
+class PatchCore(nn.Module):
+    def __init__(self, f_coreset=0.01):
+        """
+        f_coreset: Tỷ lệ lấy mẫu phụ. 
+        Để 0.01 (1%) để tiết kiệm RAM tối đa khi chạy trên Jetson Nano ở Giai đoạn 3.
+        """
+        super().__init__()
+        self.f_coreset = f_coreset
+        
+        # 1. Tải backbone WideResNet50 (Đã pre-train trên ImageNet)
+        weights = models.WideResNet50_2_Weights.IMAGENET1K_V1
+        self.backbone = models.wide_resnet50_2(weights=weights)
+        self.backbone.eval() # Bắt buộc đóng băng
+        for param in self.backbone.parameters():
             param.requires_grad = False
+
+        self.layer2_features = []
+        self.layer3_features = []
+        
+        # 2. Gắn Hook để lấy output từ các lớp trung gian
+        def hook_layer2(module, input, output):
+            self.layer2_features.append(output)
+        def hook_layer3(module, input, output):
+            self.layer3_features.append(output)
+            
+        self.backbone.layer2.register_forward_hook(hook_layer2)
+        self.backbone.layer3.register_forward_hook(hook_layer3)
+        
         self.memory_bank = None
+        # Thuật toán tìm kiếm láng giềng gần nhất
+        self.knn = NearestNeighbors(n_neighbors=1, metric='euclidean', n_jobs=-1)
 
     def extract_features(self, x):
-        with torch.no_grad():
-            features = self.feature_extractor(x)
+        """Trích xuất và gộp đặc trưng từ Layer 2 và Layer 3"""
+        self.layer2_features.clear()
+        self.layer3_features.clear()
+        
+        _ = self.backbone(x)
+        
+        # Làm mượt bằng Average Pooling
+        feat2 = F.avg_pool2d(self.layer2_features[0], 3, 1, 1)
+        feat3 = F.avg_pool2d(self.layer3_features[0], 3, 1, 1)
+        
+        # Phóng to feat3 cho bằng kích thước feat2 rồi nối lại
+        feat3 = F.interpolate(feat3, size=feat2.shape[-2:], mode='bilinear', align_corners=False)
+        features = torch.cat([feat2, feat3], dim=1) # Shape: [B, C, H, W]
+        
         return features
 
-    def fit_memory_bank(self, train_loader):
-        """ Thu thập tất cả embedding của ảnh bình thường (Canonical pose) """
-        embeddings = []
-        for imgs, _ in train_loader:
-            feats = self.extract_features(imgs)
-            # Biến đổi cục bộ thông qua phép lấy trung bình trượt (Average Pooling) theo PatchCore tiêu chuẩn
-            pooled_feats = F.avg_pool2d(feats, kernel_size=3, stride=1, padding=1)
-            flat_feats = pooled_feats.permute(0, 2, 3, 1).reshape(-1, pooled_feats.size(1))
-            embeddings.append(flat_feats)
+    def fit(self, features_list):
+        """Xây dựng Ngân hàng bộ nhớ (Memory Bank) từ tập Train"""
+        features = torch.cat(features_list, dim=0) # [Total_B, C, H, W]
+        C = features.shape[1]
         
-        self.memory_bank = torch.cat(embeddings, dim=0)
-        # Trong Phase A thực tế, bạn có thể lấy ngẫu nhiên 1% số lượng Vector để mô phỏng Coreset Sampling
-        print(f"Khởi tạo Memory Bank thành công với kích thước: {self.memory_bank.shape}")
+        # Duỗi tensor thành dạng phẳng [N, C]
+        features = features.permute(0, 2, 3, 1).reshape(-1, C)
+        
+        # Coreset Subsampling: Chỉ giữ lại ngẫu nhiên f_coreset (%) lượng đặc trưng
+        num_samples = int(features.shape[0] * self.f_coreset)
+        indices = torch.randperm(features.shape[0])[:num_samples]
+        self.memory_bank = features[indices].cpu().numpy()
+        
+        print(f"🧠 Đã nạp {self.memory_bank.shape[0]} vector đặc trưng vào Memory Bank.")
+        self.knn.fit(self.memory_bank)
 
-    def compute_anomaly_map(self, x):
-        """ Tính khoảng cách tối thiểu từ pixel đặc trưng tới Memory Bank """
-        feats = self.extract_features(x)
-        pooled_feats = F.avg_pool2d(feats, kernel_size=3, stride=1, padding=1)
-        B, C, H, W = pooled_feats.size()
-        flat_feats = pooled_feats.permute(0, 2, 3, 1).reshape(-1, C)
+    def predict(self, features):
+        """Đo lường khoảng cách để chấm điểm dị thường"""
+        B, C, H, W = features.shape
+        features_flat = features.permute(0, 2, 3, 1).reshape(-1, C).cpu().numpy()
         
-        # Tính toán ma trận khoảng cách Euclid (Mô phỏng khoảng cách Anomaly)
-        # Dùng toán tử linalg.norm để tối ưu tốc độ tính trên GPU
-        distances = torch.cdist(flat_feats.unsqueeze(0), self.memory_bank.unsqueeze(0)).squeeze(0)
-        min_distances, _ = torch.min(distances, dim=1)
+        # Đo khoảng cách tới điểm gần nhất trong Memory Bank chuẩn
+        distances, _ = self.knn.kneighbors(features_flat)
+        distances = distances.reshape(B, H, W)
         
-        anomaly_map = min_distances.view(B, 1, H, W)
-        # Nội suy song tuyến tính đưa bản đồ lỗi về bằng kích thước ảnh gốc 224x224
-        anomaly_map = F.interpolate(anomaly_map, size=(224, 224), mode='bilinear', align_corners=True)
-        return anomaly_map
+        # Điểm dị thường của ảnh là điểm có sai số (khoảng cách) lớn nhất trên bản đồ nhiệt
+        image_scores = distances.max(axis=(1, 2))
+        return image_scores
