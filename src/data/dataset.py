@@ -65,3 +65,44 @@ class GeoNormDataset(Dataset):
         gt_pts = self.labels_dict[rel_path] # [16, 2]
         
         return img_tensor, gt_pts
+    
+class MVTecRealDataset(Dataset):
+    """
+    Dataset phục vụ huấn luyện Phase 2.
+    Chỉ nạp các ảnh 'good' (không lỗi, không bóp méo nhân tạo) từ thư mục train.
+    """
+    def __init__(self, data_dir, img_size=(224, 224)):
+        self.data_dir = Path(data_dir)
+        self.img_size = img_size
+        self.img_paths = []
+        
+        # Duyệt qua tất cả các danh mục con (bottle, cable, capsule,...)
+        for category in os.listdir(self.data_dir):
+            train_good_dir = self.data_dir / category / "train" / "good"
+            if train_good_dir.exists():
+                for file in os.listdir(train_good_dir):
+                    if file.lower().endswith(('.png', '.jpg')):
+                        self.img_paths.append(train_good_dir / file)
+                        
+        print(f"Đã nạp {len(self.img_paths)} ảnh thực tế (good) vào bộ nhớ Phase 2.")
+
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize(self.img_size, antialias=True),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, idx):
+        img_path = self.img_paths[idx]
+        img = cv2.imread(str(img_path))
+        if img is None:
+            raise ValueError(f"Không thể đọc ảnh: {img_path}")
+        
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_tensor = self.transform(img)
+        
+        # Phase 2 KHÔNG CÓ nhãn gt_pts, trả về chính tensor đó làm mỏ neo
+        return img_tensor
