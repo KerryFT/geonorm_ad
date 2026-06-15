@@ -17,7 +17,7 @@ class GeoNorm(nn.Module):
         src_pts, confs = self.gln(x)
         
         # 2. Sinh trường dòng chảy (Flow Field) qua CW-TPS
-        flow_grid = self.cw_tps(src_pts, confs, out_size=x.shape[-2])
+        flow_grid = self.cw_tps(src_pts, confs, out_size=x.shape[-2:])
         
         # 3. Differentiable Grid Sampler Nắn thẳng ảnh
         x_rectified = F.grid_sample(
