@@ -1,5 +1,5 @@
 # Bỏ qua dữ liệu
-data/
+/data/
 
 # Bỏ qua model weights
 checkpoints/
