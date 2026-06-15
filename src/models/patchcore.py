@@ -15,7 +15,7 @@ class PatchCore(nn.Module):
         self.f_coreset = f_coreset
         
         # 1. Tải backbone WideResNet50 (Đã pre-train trên ImageNet)
-        weights = models.WideResNet50_2_Weights.IMAGENET1K_V1
+        weights = models.Wide_ResNet50_2_Weights.IMAGENET1K_V1
         self.backbone = models.wide_resnet50_2(weights=weights)
         self.backbone.eval() # Bắt buộc đóng băng
         for param in self.backbone.parameters():
