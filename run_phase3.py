@@ -59,16 +59,29 @@ def run_evaluation(data_dir, geonorm_weights):
     train_dataset = MVTecEvalDataset(data_dir, split="train")
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=False, num_workers=4)
     
-    print("\n[1/2] Đang xây dựng Memory Bank...")
+    print("\n[1/2] Đang xây dựng Memory Bank (Chế độ chống tràn RAM)...")
     train_features = []
+    f_coreset = 0.01 # Tỷ lệ giữ lại 1%
+    
     with torch.no_grad():
         for imgs, _ in tqdm(train_loader):
             imgs = imgs.to(device)
-            # NẮN THẲNG TRƯỚC
+            # 1. Nắn ảnh bằng GeoNorm
             x_rectified, _, _, _ = geonorm(imgs)
-            # TRÍCH ĐẶC TRƯNG TỪ ẢNH ĐÃ NẮN
-            feats = patchcore.extract_features(x_rectified)
-            train_features.append(feats.cpu())
+            
+            # 2. Trích đặc trưng bằng PatchCore
+            feats = patchcore.extract_features(x_rectified) # [B, C, H, W]
+            
+            # 3. ÉP CÂN NGAY LẬP TỨC TRÊN GPU TRƯỚC KHI ĐƯA VỀ CPU
+            B, C, H, W = feats.shape
+            feats_flat = feats.permute(0, 2, 3, 1).reshape(-1, C) # Duỗi thành [N, C]
+            
+            # Chọn ngẫu nhiên 1% số pixel
+            num_samples = max(1, int(feats_flat.shape[0] * f_coreset))
+            indices = torch.randperm(feats_flat.shape[0])[:num_samples]
+            
+            # Chỉ tải 1% dữ liệu này về CPU RAM
+            train_features.append(feats_flat[indices].cpu())
             
     patchcore.fit(train_features)
     

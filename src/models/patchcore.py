@@ -54,18 +54,11 @@ class PatchCore(nn.Module):
         
         return features
 
-    def fit(self, features_list):
-        """Xây dựng Ngân hàng bộ nhớ (Memory Bank) từ tập Train"""
-        features = torch.cat(features_list, dim=0) # [Total_B, C, H, W]
-        C = features.shape[1]
-        
-        # Duỗi tensor thành dạng phẳng [N, C]
-        features = features.permute(0, 2, 3, 1).reshape(-1, C)
-        
-        # Coreset Subsampling: Chỉ giữ lại ngẫu nhiên f_coreset (%) lượng đặc trưng
-        num_samples = int(features.shape[0] * self.f_coreset)
-        indices = torch.randperm(features.shape[0])[:num_samples]
-        self.memory_bank = features[indices].cpu().numpy()
+    def fit(self, subsampled_features_list):
+        """Xây dựng Memory Bank từ các list đã được ép cân (chỉ còn 1%)"""
+        # Lúc này list đã rất nhẹ, ghép lại thoải mái không sợ tràn RAM
+        features = torch.cat(subsampled_features_list, dim=0) 
+        self.memory_bank = features.numpy()
         
         print(f"🧠 Đã nạp {self.memory_bank.shape[0]} vector đặc trưng vào Memory Bank.")
         self.knn.fit(self.memory_bank)
