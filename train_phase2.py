@@ -9,7 +9,7 @@ from tqdm import tqdm
 import os
 import argparse
 
-def generate_smooth_distortion(imgs, scale=0.08):
+def generate_smooth_distortion(imgs, scale=0.25):
     """
     Sinh biến dạng hình học ngẫu nhiên, mượt mà trực tiếp trên GPU để phục vụ luồng Cycle.
     """
