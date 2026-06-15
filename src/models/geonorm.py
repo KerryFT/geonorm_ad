@@ -7,12 +7,12 @@ from src.models.cw_tps import ConfidenceWeightedTPS
 class GeoNorm(nn.Module):
     
     
-    def __init__(self, K=16, lam=0.1)
+    def __init__(self, K=16, lam=0.1):
         super().__init__()
         self.gln = GLN(K=K)
         self.cw_tps = ConfidenceWeightedTPS(K=K, lam=lam)
     
-    def forward(self, x)
+    def forward(self, x):
         # 1. Trích xuất tọa độ biến dạng và độ tự tin
         src_pts, confs = self.gln(x)
         
