@@ -6,8 +6,6 @@ from src.models.cw_tps import ConfidenceWeightedTPS
 
 class GeoNorm(nn.Module):
     
-    Module tiền xử lý End-to-End hoàn chỉnh.
-    Nhận ảnh đầu vào bị biến dạng - Dự đoán lưới - Nắn chỉnh - Trả về ảnh đã nắn.
     
     def __init__(self, K=16, lam=0.1)
         super().__init__()
