@@ -51,5 +51,5 @@ def visualize_rectification(data_dir, weights_path):
 if __name__ == "__main__":
     # Điền cứng đường dẫn để chạy test nhanh
     data = "/kaggle/input/datasets/trungnguynhongv/geonorm-mvtec-geo/mvtec_geo/mvtec_severe"
-    weights = "/kaggle/input/datasets/trungnguynhongv/geonorm-phase1-weights/phase1_best_weights.pth"
+    weights = "/kaggle/input/datasets/trungnguynhongv/weight-phase1/geonorm_phase1.pth"
     visualize_rectification(data, weights)
