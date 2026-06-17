@@ -19,10 +19,10 @@ class GLN(nn.Module):
         in_features = 384 
         
         # 2. Nhánh 1: Regression dự đoán tọa độ K điểm kiểm soát (x, y)
+        # Trong gln.py, chỗ định nghĩa coord_head
         self.coord_head = nn.Sequential(
-            nn.Linear(in_features, in_features // 2),
-            nn.GELU(),
-            nn.Linear(in_features // 2, K * 2)
+            nn.Linear(hidden_dim, K * 2),
+            nn.Tanh() # Ép buộc mọi output nằm gọn trong [-1, 1]
         )
         
         # 3. Nhánh 2: Classification dự đoán trọng số tự tin c_i

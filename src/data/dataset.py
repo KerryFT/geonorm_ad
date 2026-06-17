@@ -9,6 +9,7 @@ class GeoNormDataset(Dataset):
     """
     Dataset phục vụ huấn luyện Phase 1 (Supervised Pre-training).
     Tải ảnh biến dạng từ thư mục và nhãn tọa độ (gt_pts) từ file .pt.
+    ĐÃ TÍCH HỢP CHUẨN HÓA TỌA ĐỘ VỀ [-1, 1] ON-THE-FLY.
     """
     def __init__(self, data_dir, labels_file, img_size=(224, 224)):
         self.data_dir = Path(data_dir)
@@ -39,7 +40,6 @@ class GeoNormDataset(Dataset):
         print(f"Đã tải {len(self.img_paths)} mẫu dữ liệu vào bộ nhớ.")
 
         # 3. Định nghĩa các phép biến đổi ảnh (Transforms)
-        # MobileViT thường yêu cầu đầu vào chuẩn hóa theo chuẩn ImageNet
         self.transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize(self.img_size, antialias=True),
@@ -56,15 +56,26 @@ class GeoNormDataset(Dataset):
         img = cv2.imread(str(full_path))
         if img is None:
             raise ValueError(f"Không thể đọc ảnh: {full_path}")
+            
+        # Lấy kích thước gốc của ảnh (H, W) TRƯỚC KHI resize
+        H, W, _ = img.shape 
+        
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
-        # Áp dụng Transform
+        # Áp dụng Transform cho ảnh
         img_tensor = self.transform(img)
         
-        # Lấy nhãn tọa độ lưới
-        gt_pts = self.labels_dict[rel_path] # [16, 2]
+        # --- BẮT ĐẦU CHUẨN HÓA TỌA ĐỘ ON-THE-FLY ---
+        # Lấy nhãn tọa độ lưới gốc (Pixel) và clone để không làm hỏng dữ liệu gốc trong RAM
+        gt_pts_pixel = self.labels_dict[rel_path].clone().float() # [16, 2]
         
-        return img_tensor, gt_pts
+        # Công thức chuẩn hóa về [-1, 1]
+        gt_pts_norm = torch.empty_like(gt_pts_pixel)
+        gt_pts_norm[:, 0] = (gt_pts_pixel[:, 0] / (W / 2.0)) - 1.0  # Trục X
+        gt_pts_norm[:, 1] = (gt_pts_pixel[:, 1] / (H / 2.0)) - 1.0  # Trục Y
+        # -------------------------------------------
+        
+        return img_tensor, gt_pts_norm
     
 class MVTecRealDataset(Dataset):
     """
