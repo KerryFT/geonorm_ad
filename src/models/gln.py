@@ -19,10 +19,10 @@ class GLN(nn.Module):
         in_features = 384 
         
         # 2. Nhánh 1: Regression dự đoán tọa độ K điểm kiểm soát (x, y)
-        # Trong gln.py, chỗ định nghĩa coord_head
+        # Đã sửa hidden_dim thành in_features và bọc Tanh để ép vùng tọa độ về [-1, 1]
         self.coord_head = nn.Sequential(
-            nn.Linear(hidden_dim, K * 2),
-            nn.Tanh() # Ép buộc mọi output nằm gọn trong [-1, 1]
+            nn.Linear(in_features, K * 2),
+            nn.Tanh() 
         )
         
         # 3. Nhánh 2: Classification dự đoán trọng số tự tin c_i
@@ -38,9 +38,10 @@ class GLN(nn.Module):
         self._initialize_weights()
 
     def _initialize_weights(self):
-        """ Ép đầu ra ban đầu của coord_head gần bằng 0 để mạng bắt đầu với biến đổi Identity """
-        nn.init.zeros_(self.coord_head[-1].weight)
-        nn.init.zeros_(self.coord_head[-1].bias)
+        """ Ép đầu ra ban đầu của lớp Linear về 0 để mô hình bắt đầu từ phép biến đổi đồng nhất (Identity) """
+        # Đã sửa từ [-1] thành [0] để trỏ chính xác vào lớp nn.Linear thay vì nn.Tanh
+        nn.init.zeros_(self.coord_head[0].weight)
+        nn.init.zeros_(self.coord_head[0].bias)
 
     def forward(self, x):
         # x: [B, 3, H, W]
@@ -69,6 +70,7 @@ if __name__ == "__main__":
     print(f"Kích thước Tọa độ (Coords)  : {coords.shape}  | Kỳ vọng: [2, 16, 2]")
     print(f"Kích thước Tự tin (Confs)   : {confs.shape}     | Kỳ vọng: [2, 16]")
     
-    # Kiểm tra tính hợp lệ của hàm Sigmoid
+    # Kiểm tra tính hợp lệ của hàm Sigmoid và Tanh
     assert (confs >= 0).all() and (confs <= 1).all(), "Lỗi: Confidence score vượt quá biên [0, 1]"
+    assert (coords >= -1).all() and (coords <= 1).all(), "Lỗi: Tọa độ đầu ra vượt quá không gian chuẩn hóa [-1, 1]"
     print("✅ Unit Test cục bộ: Hoàn hảo!")
