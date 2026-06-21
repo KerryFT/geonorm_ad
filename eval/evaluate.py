@@ -28,35 +28,52 @@ from eval.metrics import ResultsAccumulator, print_results_table, print_geo_robu
 # ---------------------------------------------------------------------------
 @torch.no_grad()
 def build_memory_bank(
-    model:        GeoNormAD,
-    patchcore:    PatchCore,
-    train_loader: torch.utils.data.DataLoader,
-    device:       str = "cuda",
-) -> None:
-    """
-    Build PatchCore memory bank từ RECTIFIED training images.
+    model,
+    patchcore,
+    train_loader,
+    device="cuda"
+):
 
-    QUAN TRỌNG: Phải dùng cùng pipeline (GeoNorm → features) như khi inference.
-    Nếu memory bank từ original images nhưng test features từ rectified → mismatch
-    → AUROC thấp (đây là bug trong kết quả 72.33% trước).
-    """
     model.eval()
     patchcore.eval()
+
     all_feats = []
 
     for batch in tqdm(train_loader, desc="  Building memory bank (rectified)"):
-        imgs = batch["image"].to(device)    # [B, 3, H, W]
 
-        # ── GeoNorm rectification (KHÔNG có AD head) ──
-        x_rect, _, _ = model.rectify(imgs)  # [B, 3, H, W]
+        imgs = batch["image"].to(device)
 
-        # ── Extract features từ RECTIFIED image ──
-        feats = patchcore._extract_patch_features(x_rect)   # [B, N_patches, C]
-        all_feats.append(feats.reshape(-1, feats.shape[-1]).cpu())
+        x_rect, _, _ = model.rectify(imgs)
 
-    all_feats = torch.cat(all_feats, dim=0)    # [N_total, C]
-    patchcore.memory_bank = patchcore._coreset_sample(all_feats)
-    print(f"  Memory bank: {patchcore.memory_bank.shape[0]:,} vectors")
+        feats = patchcore._extract_patch_features(x_rect)
+
+        all_feats.append(
+            feats.reshape(
+                -1,
+                feats.shape[-1]
+            ).cpu()
+        )
+
+    all_feats = torch.cat(
+        all_feats,
+        dim=0
+    )
+
+    print("all_feats:", all_feats.shape)
+
+
+    selected_idx = patchcore._coreset_sample(
+        all_feats
+    )
+
+    print("selected_idx:", selected_idx.shape)
+
+
+    patchcore.memory_bank = all_feats[
+        selected_idx
+    ].cpu()
+
+    print("memory_bank:", patchcore.memory_bank.shape)
 
 
 # ---------------------------------------------------------------------------
