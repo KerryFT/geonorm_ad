@@ -17,7 +17,7 @@ import torch.nn.functional as F
 from torchvision.models import wide_resnet50_2, Wide_ResNet50_2_Weights
 from typing import Optional
 from tqdm import tqdm
-
+from sklearn.random_projection import SparseRandomProjection
 
 class PatchCore(nn.Module):
     """
@@ -45,6 +45,10 @@ class PatchCore(nn.Module):
         self.k_nearest     = k_nearest
         self.patch_size    = patch_size
         self.output_size   = output_size
+        self.projector = SparseRandomProjection(
+        n_components='auto',
+        eps=0.9
+        )
 
         # Feature extractor (frozen)
         self._build_extractor()
@@ -62,12 +66,11 @@ class PatchCore(nn.Module):
             for batch in tqdm(train_loader, desc="Building memory bank"):
                 imgs = batch["image"].to(device) if isinstance(batch, dict) else batch[0].to(device)
                 feats = self._extract_patch_features(imgs)   # [B, N_patches, C]
-                all_feats.append(feats.reshape(-1, feats.shape[-1]).cpu())
+                all_feats.append(feats.reshape(-1, feats.shape[-1]))
 
-        all_feats = torch.cat(all_feats, dim=0)   # [N_total, C]
+        selected_idx = self._coreset_sample(all_feats)
 
-        # Greedy coreset subsampling
-        self.memory_bank = self._coreset_sample(all_feats)
+        self.memory_bank = all_feats[selected_idx].cpu()
         print(f"  Memory bank: {self.memory_bank.shape[0]:,} vectors × {self.memory_bank.shape[1]} dims")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -156,31 +159,127 @@ class PatchCore(nn.Module):
         # Reshape thành [B, N_patches, C]
         return feats.permute(0, 2, 3, 1).reshape(B, H_p * W_p, C)
 
-    def _coreset_sample(self, feats: torch.Tensor) -> torch.Tensor:
-        """
-        Greedy coreset subsampling để giảm memory bank.
-        Iteratively chọn sample xa nhất so với các sample đã chọn.
-        """
-        n_keep = max(1, int(len(feats) * self.coreset_ratio))
-        if n_keep >= len(feats):
-            return feats
+    def _coreset_sample(
+        self,
+        feats: torch.Tensor
+    ):
 
-        print(f"  Coreset sampling: {len(feats):,} → {n_keep:,} vectors…")
+        N = len(feats)
 
-        # Khởi tạo với sample ngẫu nhiên
-        selected = [torch.randint(len(feats), (1,)).item()]
-        selected_feats = feats[selected]   # [1, C]
+        n_keep = max(
+            1,
+            int(
+                N *
+                self.coreset_ratio
+            )
+        )
 
-        for _ in tqdm(range(n_keep - 1), desc="  Coreset", leave=False):
-            # Distance tới tập đã chọn gần nhất
-            dists = torch.cdist(feats, selected_feats)   # [N, k_selected]
-            min_dists = dists.min(dim=1).values           # [N]
-            # Chọn sample xa nhất
-            next_idx = min_dists.argmax().item()
+        if n_keep >= N:
+
+            return torch.arange(
+                N,
+                device=feats.device
+            )
+
+
+        print(
+            f"  Coreset sampling:"
+            f" {N:,}"
+            f" → {n_keep:,} vectors..."
+        )
+
+        device = feats.device
+
+
+        # ===============================
+        # Random Projection
+        # ===============================
+
+        feats_np = feats.cpu().numpy()
+
+        feats_proj = self.projector.fit_transform(
+            feats_np
+        )
+
+        feats_proj = torch.from_numpy(
+            feats_proj
+        ).float().to(device)
+
+
+
+        # ===============================
+        # Approx Greedy Coreset
+        # ===============================
+
+        selected = []
+
+        first_idx = torch.randint(
+            N,
+            (1,),
+            device=device
+        ).item()
+
+        selected.append(first_idx)
+
+
+        min_dist = torch.cdist(
+
+            feats_proj,
+
+            feats_proj[
+                first_idx:
+                first_idx+1
+            ]
+
+        ).squeeze(1)
+
+
+
+        for _ in tqdm(
+
+            range(n_keep - 1),
+
+            desc="  Coreset",
+
+            leave=False
+
+        ):
+
+            next_idx = min_dist.argmax().item()
+
             selected.append(next_idx)
-            selected_feats = feats[selected]
 
-        return feats[selected]
+
+            dist_new = torch.cdist(
+
+                feats_proj,
+
+                feats_proj[
+                    next_idx:
+                    next_idx+1
+                ]
+
+            ).squeeze(1)
+
+
+            min_dist = torch.minimum(
+
+                min_dist,
+
+                dist_new
+
+            )
+
+
+        return torch.tensor(
+
+            selected,
+
+            device=device,
+
+            dtype=torch.long
+
+        )
 
     def _batch_knn(
         self,
