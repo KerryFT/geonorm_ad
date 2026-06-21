@@ -1,10 +1,94 @@
-# Bỏ qua dữ liệu
-/data/
-
-# Bỏ qua model weights
-checkpoints/
-
-# Bỏ qua hệ thống
+# ─── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# ─── Virtual environments ─────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
 .env
+
+# ─── Data — KHÔNG push dataset lên GitHub (quá nặng) ────────────────────────
+# MVTec AD gốc (~5GB)
+data/mvtec_ad/
+mvtec_ad/
+mvtec-anomaly-detection/
+
+# MVTec-Geo (~15GB generated)
+mvtec_geo/
+mvtec_l0/
+mvtec_mild/
+mvtec_moderate/
+mvtec_severe/
+
+# Bất kỳ thư mục data nào ở working dir
+**/train/good/*.png
+**/test/**/*.png
+**/ground_truth/**/*.png
+**/warp_params/**/*.json
+
+# ─── Model checkpoints ───────────────────────────────────────────────────────
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+
+# ─── Results / outputs ───────────────────────────────────────────────────────
+results/
+outputs/
+runs/
+wandb/
+logs/
+*.log
+*.csv
+
+# ─── Jupyter ─────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ─── IDE ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ─── Kaggle / Colab artifacts ────────────────────────────────────────────────
+kaggle.json
+*.kaggle
+/kaggle/
+
+# ─── Misc ────────────────────────────────────────────────────────────────────
+*.zip
+*.tar.gz
+*.tgz
+tmp/
+temp/
+.cache/

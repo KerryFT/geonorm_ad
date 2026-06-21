@@ -1,0 +1,80 @@
+# config/config.yaml
+# GeoNorm-AD — Hyperparameters
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+paths:
+  mvtec_root:   "/kaggle/input/mvtec-anomaly-detection"
+  geo_root:     "/kaggle/working/mvtec_geo"
+  checkpoints:  "/kaggle/working/checkpoints"
+  results:      "/kaggle/working/results"
+
+# ── Data ─────────────────────────────────────────────────────────────────────
+data:
+  image_size:  224
+  batch_size:  16          # Phase 1 training
+  num_workers: 4
+  categories:              # null → chạy tất cả 15 categories
+    - "bottle"
+    - "cable"
+    - "capsule"
+    - "carpet"
+    - "grid"
+    - "hazelnut"
+    - "leather"
+    - "metal_nut"
+    - "pill"
+    - "screw"
+    - "tile"
+    - "toothbrush"
+    - "transistor"
+    - "wood"
+    - "zipper"
+  severities:
+    - "mild"
+    - "moderate"
+    - "severe"
+
+# ── GeoNorm Model ─────────────────────────────────────────────────────────────
+model:
+  K:           16           # Số control points (phải là số chính phương)
+  backbone:    "mobilevit_xs"
+  pretrained:  true
+  lam_tps:     0.1          # λ trong CW-TPS regularization
+  inv_iters:   10           # Số iterations cho inverse TPS
+
+# ── Phase 1: Supervised pre-training ─────────────────────────────────────────
+phase1:
+  severity_train: "moderate"
+  epochs:     50
+  lr:         1.0e-4
+  weight_decay: 1.0e-4
+  weight_ent: 0.05          # δ cho L_ent loss
+  grad_clip:  1.0
+
+# ── Phase 2: Cycle consistency fine-tuning ────────────────────────────────────
+phase2:
+  epochs:     20
+  lr:         5.0e-5
+  weight_cycle: 0.5         # β cho L_cycle
+
+# ── PatchCore AD Head ─────────────────────────────────────────────────────────
+patchcore:
+  coreset_ratio: 0.1        # Giữ lại 10% vectors trong memory bank
+  k_nearest:     5          # k cho KNN scoring
+  patch_size:    3          # AvgPool kernel
+  output_size:   224        # Upsample score map về size này
+
+# ── Evaluation ────────────────────────────────────────────────────────────────
+eval:
+  batch_size:    4          # Nhỏ hơn vì inference nặng hơn training
+  use_back_proj: true       # Dùng inverse TPS để project score về original coords
+  eval_severities:
+    - "l0"
+    - "mild"
+    - "moderate"
+    - "severe"
+
+# ── Go/No-Go Gate ─────────────────────────────────────────────────────────────
+gate:
+  min_delta_auroc: 3.0      # % improvement tối thiểu trên L2 so với baseline
+  target_severity: "moderate"

@@ -1,7 +1,14 @@
+# GeoNorm-AD dependencies
+# Kaggle T4 / Google Colab compatible
+
 torch>=2.0.0
-torchvision
-numpy>=1.22.0
-scipy>=1.8.0
-opencv-python>=4.5.0
-scikit-learn>=1.0.0
-tqdm>=4.64.0
+torchvision>=0.15.0
+timm>=0.9.0                 # MobileViT-XS backbone
+numpy>=1.24.0
+scipy>=1.10.0               # RectBivariateSpline cho TPS distortion
+opencv-python>=4.7.0        # cv2.remap
+Pillow>=9.5.0
+scikit-learn>=1.2.0         # roc_auc_score
+matplotlib>=3.7.0           # visualization
+tqdm>=4.65.0
+pyyaml>=6.0                 # config loading
