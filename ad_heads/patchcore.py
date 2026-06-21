@@ -57,22 +57,75 @@ class PatchCore(nn.Module):
         self.memory_bank: Optional[torch.Tensor] = None   # [N, C]
 
     # ── public ──────────────────────────────────────────────────────────────
-    def fit(self, train_loader: torch.utils.data.DataLoader, device: str = "cuda") -> None:
-        """Build memory bank từ training images (đã qua GeoNorm nếu dùng GeoNorm-AD)."""
+    def fit(
+        self,
+        train_loader,
+        device="cuda"
+    ):
+
         self.eval()
+
         all_feats = []
 
         with torch.no_grad():
-            for batch in tqdm(train_loader, desc="Building memory bank"):
-                imgs = batch["image"].to(device) if isinstance(batch, dict) else batch[0].to(device)
-                feats = self._extract_patch_features(imgs)   # [B, N_patches, C]
-                all_feats.append(feats.reshape(-1, feats.shape[-1]))
 
-        selected_idx = self._coreset_sample(all_feats)
+            for batch in tqdm(
+                train_loader,
+                desc="Building memory bank"
+            ):
 
-        self.memory_bank = all_feats[selected_idx].cpu()
-        print(f"  Memory bank: {self.memory_bank.shape[0]:,} vectors × {self.memory_bank.shape[1]} dims")
+                imgs = (
+                    batch["image"].to(device)
+                    if isinstance(batch, dict)
+                    else batch[0].to(device)
+                )
 
+                feats = self._extract_patch_features(imgs)
+
+                all_feats.append(
+
+                    feats.reshape(
+                        -1,
+                        feats.shape[-1]
+                    )
+
+                )
+
+
+        # QUAN TRỌNG
+        all_feats = torch.cat(
+            all_feats,
+            dim=0
+        )
+
+
+        selected_idx = self._coreset_sample(
+            all_feats
+        )
+
+
+        self.memory_bank = (
+
+            all_feats[
+                selected_idx
+            ]
+
+            .cpu()
+
+        )
+
+
+        print(
+
+            f"  Memory bank: "
+
+            f"{self.memory_bank.shape[0]:,}"
+
+            f" vectors × "
+
+            f"{self.memory_bank.shape[1]} dims"
+
+        )
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Tính anomaly score map.
