@@ -278,7 +278,7 @@ if __name__ == "__main__":
     parser.add_argument("--baseline_only", action="store_true")
     args = parser.parse_args()
 
-    patchcore = PatchCore(coreset_ratio=0.02, k_nearest=5)
+    patchcore = PatchCore(coreset_ratio=0.01, k_nearest=5)
 
     if args.baseline_only:
         run_baseline_evaluation(
