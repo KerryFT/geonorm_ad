@@ -103,7 +103,7 @@ class MVTecDataset(Dataset):
             "category":    sample["category"],
             "defect_type": sample["defect_type"],
             "image_path":  str(sample["image_path"]),
-            "warp_params": warp_params,  # dict | None
+            "warp_params": warp_params if warp_params is not None else {},rams,  # dict | None
         }
 
     # ── private ─────────────────────────────────────────────────────────────
@@ -183,5 +183,5 @@ def make_loader(
         shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=True,
-        drop_last=(split == "train"),
+        drop_last=False,
     )
