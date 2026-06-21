@@ -105,6 +105,29 @@ def evaluate_category(
 # ---------------------------------------------------------------------------
 # Full multi-severity evaluation
 # ---------------------------------------------------------------------------
+def _resolve_cat_root(
+    severity:    str,
+    data_root:   str,
+    category:    str,
+    l0_root:     Optional[str] = None,
+) -> Optional[Path]:
+    """
+    Trả về path đến {category}/ cho một severity cụ thể.
+
+    L0 có thể trỏ thẳng vào Kaggle input (không cần copy):
+        l0_root = "/kaggle/input/mvtec-anomaly-detection"
+        → cat_root = /kaggle/input/mvtec-anomaly-detection/{category}/
+
+    L1-L3 dùng data_root như bình thường:
+        → cat_root = {data_root}/mvtec_{severity}/{category}/
+    """
+    if severity == "l0":
+        root = Path(l0_root) if l0_root else Path(data_root) / "mvtec_l0"
+        return root / category
+    else:
+        return Path(data_root) / f"mvtec_{severity}" / category
+
+
 def run_full_evaluation(
     model:        GeoNormAD,
     patchcore:    PatchCore,
@@ -114,12 +137,22 @@ def run_full_evaluation(
     batch_size:   int = 4,
     num_workers:  int = 4,
     device:       str = "cuda",
-    severities:   tuple = ("l0", "mild", "moderate", "severe"),
+    severities:   tuple = ("l0", "mild", "moderate"),
     checkpoint:   Optional[str] = None,
+    l0_root:      Optional[str] = None,
 ) -> None:
     """
-    Chạy evaluation toàn bộ: L0 + L1 + L2 + L3.
-    Build memory bank riêng cho từng severity.
+    Chạy evaluation theo các severity levels.
+
+    Parameters
+    ----------
+    severities : tuple
+        Mặc định ("l0", "mild", "moderate") — bỏ "severe" để tiết kiệm disk.
+        Thêm "severe" sau khi confirm approach works.
+    l0_root : str | None
+        Path đến MVTec AD gốc. Nếu set, L0 dùng thẳng nguồn này
+        thay vì tìm mvtec_l0/ trong data_root.
+        Trên Kaggle: "/kaggle/input/mvtec-anomaly-detection"
     """
     if checkpoint is not None:
         ckpt = torch.load(checkpoint, map_location=device)
@@ -135,8 +168,7 @@ def run_full_evaluation(
     print(f"\n  Category: {category}")
 
     for severity in severities:
-        sev_tag  = f"mvtec_{severity}"
-        cat_root = Path(data_root) / sev_tag / category
+        cat_root = _resolve_cat_root(severity, data_root, category, l0_root)
 
         if not cat_root.exists():
             print(f"  ⚠ {cat_root} không tồn tại, bỏ qua.")
