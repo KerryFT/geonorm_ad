@@ -103,7 +103,7 @@ class MVTecDataset(Dataset):
             "category":    sample["category"],
             "defect_type": sample["defect_type"],
             "image_path":  str(sample["image_path"]),
-            "warp_params": warp_params if warp_params is not None else {},rams,  # dict | None
+            "warp_params": warp_params if warp_params is not None else {},  # dict | None
         }
 
     # ── private ─────────────────────────────────────────────────────────────
