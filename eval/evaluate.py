@@ -185,7 +185,7 @@ if __name__ == "__main__":
                         help="Path đến MVTec AD gốc. "
                              "Kaggle: /kaggle/input/mvtec-anomaly-detection")
     parser.add_argument("--no_severe",   action="store_true")
-    parser.add_argument("--coreset",     type=float, default=0.1)
+    parser.add_argument("--coreset",     type=float, default=0.01)
     args = parser.parse_args()
 
     sevs = ["l0", "mild", "moderate"]
