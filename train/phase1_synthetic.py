@@ -41,7 +41,14 @@ class SyntheticWarpDataset(Dataset):
 
         geo_root = Path(root) / f"mvtec_{severity}" / category
         img_dir  = geo_root / "train" / "good"
-        wp_dir   = geo_root / "warp_params" / "train" / "good"
+        wp_dir = (
+            Path(root)
+            / f"mvtec_{severity}"
+            / "warp_params"
+            / category
+            / "train"
+            / "good"
+        )
 
         self.samples = []
         for img_path in sorted(img_dir.glob("*")):
